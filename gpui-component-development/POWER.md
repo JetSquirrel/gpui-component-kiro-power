@@ -42,6 +42,14 @@ Call action "readSteering" to access specific topics as needed.
 ## Quick Start
 
 ### Critical First Step: Component Initialization
+Add dependencies to your Cargo.toml:
+```toml
+[dependencies]
+gpui = "0.2.2"
+gpui-component = "0.5.0"
+# Optional, for default bundled assets
+gpui-component-assets = "0.5.0"
+```
 
 **⚠️ IMPORTANT:** You MUST call `gpui_component::init(cx)` at your application's entry point before using any GPUI Component features.
 
@@ -89,39 +97,50 @@ my-gpui-app/
 
 ### 1. Stateless Design Philosophy
 
-Components should be stateless when possible using the `RenderOnce` trait:
+Here's a simple example to get you started:
 
 ```rust
-use gpui_component::prelude::*;
+use gpui::*;
+use gpui_component::{button::*, *};
 
-#[derive(IntoElement)]
-pub struct MyComponent {
-    label: SharedString,
-    variant: ButtonVariant,
-}
+pub struct HelloWorld;
 
-impl MyComponent {
-    pub fn new(label: impl Into<SharedString>) -> Self {
-        Self {
-            label: label.into(),
-            variant: ButtonVariant::Default,
-        }
-    }
-    
-    pub fn primary(mut self) -> Self {
-        self.variant = ButtonVariant::Primary;
-        self
-    }
-}
-
-impl RenderOnce for MyComponent {
-    fn render(self, cx: &mut WindowContext) -> impl IntoElement {
+impl Render for HelloWorld {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
         div()
-            .child(self.label)
-            .when(self.variant == ButtonVariant::Primary, |el| {
-                el.bg(cx.theme().colors().primary)
-            })
+            .v_flex()
+            .gap_2()
+            .size_full()
+            .items_center()
+            .justify_center()
+            .child("Hello, World!")
+            .child(
+                Button::new("ok")
+                    .primary()
+                    .label("Let's Go!")
+                    .on_click(|_, _, _| println!("Clicked!")),
+            )
     }
+}
+
+fn main() {
+    let app = Application::new().with_assets(gpui_component_assets::Assets);
+
+    app.run(move |cx| {
+        // This must be called before using any GPUI Component features.
+        gpui_component::init(cx);
+
+        cx.spawn(async move |cx| {
+            cx.open_window(WindowOptions::default(), |window, cx| {
+                let view = cx.new(|_| HelloWorld);
+                // This first level on the window, should be a Root.
+                cx.new(|cx| Root::new(view, window, cx))
+            })?;
+
+            Ok::<_, anyhow::Error>(())
+        })
+        .detach();
+    });
 }
 ```
 
