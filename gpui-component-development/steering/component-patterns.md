@@ -10,7 +10,8 @@ Comprehensive guide to developing components with GPUI Component library pattern
 Use `RenderOnce` trait for components without internal state:
 
 ```rust
-use gpui_component::prelude::*;
+use gpui::*;
+use gpui_component::ActiveTheme;
 
 #[derive(IntoElement)]
 pub struct Badge {
@@ -40,15 +41,15 @@ impl Badge {
 }
 
 impl RenderOnce for Badge {
-    fn render(self, cx: &mut WindowContext) -> impl IntoElement {
+    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         div()
             .px_2()
             .py_1()
             .rounded_md()
             .text_sm()
             .when(self.variant == BadgeVariant::Primary, |el| {
-                el.bg(cx.theme().colors().primary)
-                  .text_color(cx.theme().colors().primary_foreground)
+                el.bg(cx.theme().primary)
+                  .text_color(cx.theme().primary_foreground)
             })
             .when(self.size == Size::Large, |el| {
                 el.px_3().py_2().text_base()
@@ -104,7 +105,7 @@ impl<T> Select<T> {
 }
 
 impl<T> Render for Select<T> {
-    fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         // Implementation with state management
         div()
             .id(self.id.clone())
@@ -199,7 +200,7 @@ Apply different styles based on size:
 
 ```rust
 impl RenderOnce for Button {
-    fn render(self, cx: &mut WindowContext) -> impl IntoElement {
+    fn render(self, _window: &mut Window, _cx: &mut App) -> impl IntoElement {
         div()
             .flex()
             .items_center()
@@ -262,22 +263,22 @@ Apply styles based on variant:
 
 ```rust
 impl RenderOnce for Button {
-    fn render(self, cx: &mut WindowContext) -> impl IntoElement {
+    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme();
         
         div()
             .when(self.variant == ButtonVariant::Primary, |el| {
-                el.bg(theme.colors().primary)
-                  .text_color(theme.colors().primary_foreground)
-                  .hover(|el| el.bg(theme.colors().primary.opacity(0.9)))
+                el.bg(theme.primary)
+                  .text_color(theme.primary_foreground)
+                  .hover(|el| el.bg(theme.primary.opacity(0.9)))
             })
             .when(self.variant == ButtonVariant::Outline, |el| {
                 el.border_1()
-                  .border_color(theme.colors().border)
-                  .hover(|el| el.bg(theme.colors().accent))
+                  .border_color(theme.border)
+                  .hover(|el| el.bg(theme.accent))
             })
             .when(self.variant == ButtonVariant::Ghost, |el| {
-                el.hover(|el| el.bg(theme.colors().accent))
+                el.hover(|el| el.bg(theme.accent))
             })
             .when(self.variant.is_link(), |el| {
                 el.cursor_pointer() // Links use pointer cursor
@@ -298,13 +299,13 @@ Standard click event handling:
 
 ```rust
 pub struct Button {
-    on_click: Option<Box<dyn Fn(&ClickEvent, &mut WindowContext)>>,
+    on_click: Option<Box<dyn Fn(&ClickEvent, &mut Window, &mut App)>>,
 }
 
 impl Button {
     pub fn on_click<F>(mut self, handler: F) -> Self
     where
-        F: Fn(&ClickEvent, &mut WindowContext) + 'static,
+        F: Fn(&ClickEvent, &mut Window, &mut App) + 'static,
     {
         self.on_click = Some(Box::new(handler));
         self
@@ -312,10 +313,10 @@ impl Button {
 }
 
 impl RenderOnce for Button {
-    fn render(self, cx: &mut WindowContext) -> impl IntoElement {
+    fn render(self, _window: &mut Window, _cx: &mut App) -> impl IntoElement {
         div()
             .when_some(self.on_click, |el, handler| {
-                el.on_click(move |event, cx| handler(event, cx))
+                el.on_click(move |event, window, cx| handler(event, window, cx))
             })
             .child("Button")
     }
@@ -328,13 +329,13 @@ For input components:
 
 ```rust
 pub struct Input {
-    on_change: Option<Box<dyn Fn(&str, &mut WindowContext)>>,
+    on_change: Option<Box<dyn Fn(&str, &mut Window, &mut App)>>,
 }
 
 impl Input {
     pub fn on_change<F>(mut self, handler: F) -> Self
     where
-        F: Fn(&str, &mut WindowContext) + 'static,
+        F: Fn(&str, &mut Window, &mut App) + 'static,
     {
         self.on_change = Some(Box::new(handler));
         self
@@ -354,24 +355,24 @@ pub struct SelectionChanged {
 }
 
 pub struct Select {
-    on_selection_changed: Option<Box<dyn Fn(&SelectionChanged, &mut WindowContext)>>,
+    on_selection_changed: Option<Box<dyn Fn(&SelectionChanged, &mut Window, &mut App)>>,
 }
 
 impl Select {
     pub fn on_selection_changed<F>(mut self, handler: F) -> Self
     where
-        F: Fn(&SelectionChanged, &mut WindowContext) + 'static,
+        F: Fn(&SelectionChanged, &mut Window, &mut App) + 'static,
     {
         self.on_selection_changed = Some(Box::new(handler));
         self
     }
 
-    fn handle_selection(&self, index: usize, value: String, cx: &mut WindowContext) {
+    fn handle_selection(&self, index: usize, value: String, window: &mut Window, cx: &mut App) {
         if let Some(ref handler) = self.on_selection_changed {
             handler(&SelectionChanged {
                 selected_index: Some(index),
                 selected_value: value,
-            }, cx);
+            }, window, cx);
         }
     }
 }
@@ -385,13 +386,13 @@ Always use theme colors and values:
 
 ```rust
 impl RenderOnce for Card {
-    fn render(self, cx: &mut WindowContext) -> impl IntoElement {
+    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme();
         
         div()
-            .bg(theme.colors().card)
+            .bg(theme.card)
             .border_1()
-            .border_color(theme.colors().border)
+            .border_color(theme.border)
             .rounded_lg()
             .shadow_sm()
             .p_6()
@@ -405,16 +406,17 @@ impl RenderOnce for Card {
 Use `when` for conditional styles:
 
 ```rust
+// Inside RenderOnce::render(self, _window: &mut Window, cx: &mut App)
 div()
     .when(self.disabled, |el| {
         el.opacity(0.5).cursor_not_allowed()
     })
     .when(self.selected, |el| {
-        el.bg(cx.theme().colors().accent)
+        el.bg(cx.theme().accent)
     })
     .when_some(self.error, |el, error| {
-        el.border_color(cx.theme().colors().destructive)
-          .child(div().text_color(cx.theme().colors().destructive).child(error))
+        el.border_color(cx.theme().destructive)
+          .child(div().text_color(cx.theme().destructive).child(error))
     })
 ```
 
@@ -442,7 +444,7 @@ For components that need internal state:
 ```rust
 pub struct Toggle {
     checked: bool,
-    on_change: Option<Box<dyn Fn(bool, &mut WindowContext)>>,
+    on_change: Option<Box<dyn Fn(bool, &mut Window, &mut App)>>,
 }
 
 impl Toggle {
@@ -451,23 +453,23 @@ impl Toggle {
         self
     }
 
-    fn toggle(&mut self, cx: &mut ViewContext<Self>) {
+    fn toggle(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.checked = !self.checked;
         if let Some(ref handler) = self.on_change {
-            handler(self.checked, cx);
+            handler(self.checked, window, cx);
         }
         cx.notify(); // Trigger re-render
     }
 }
 
 impl Render for Toggle {
-    fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         div()
-            .on_click(cx.listener(|this, _event, cx| {
-                this.toggle(cx);
+            .on_click(cx.listener(|this, _event, window, cx| {
+                this.toggle(window, cx);
             }))
             .when(self.checked, |el| {
-                el.bg(cx.theme().colors().primary)
+                el.bg(cx.theme().primary)
             })
             .child("Toggle")
     }
@@ -495,7 +497,7 @@ cx.set_global(AppSettings {
 
 // Access in components
 impl Render for SettingsView {
-    fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let settings = cx.global::<AppSettings>();
         
         div()
@@ -513,15 +515,17 @@ Support keyboard navigation:
 
 ```rust
 impl RenderOnce for Button {
-    fn render(self, cx: &mut WindowContext) -> impl IntoElement {
+    fn render(self, _window: &mut Window, _cx: &mut App) -> impl IntoElement {
+        let on_click = self.on_click;
+        
         div()
             .id(self.id.clone())
             .focusable()
-            .on_key_down(|event, cx| {
+            .on_key_down(move |event, window, cx| {
                 if event.keystroke.key == "Enter" || event.keystroke.key == " " {
                     // Trigger click
-                    if let Some(ref handler) = self.on_click {
-                        handler(&ClickEvent::default(), cx);
+                    if let Some(ref handler) = on_click {
+                        handler(&ClickEvent::default(), window, cx);
                     }
                 }
             })
@@ -579,7 +583,7 @@ impl Input {
 }
 
 impl RenderOnce for Input {
-    fn render(self, cx: &mut WindowContext) -> impl IntoElement {
+    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let has_error = self.error.is_some();
         
         div()
@@ -587,21 +591,21 @@ impl RenderOnce for Input {
             .flex_col()
             .gap_1()
             .child(
-                input()
-                    .value(self.value)
+                div()  // Note: input() may not exist, using div as placeholder
+                    .child(self.value)
                     .border_1()
                     .when(has_error, |el| {
-                        el.border_color(cx.theme().colors().destructive)
+                        el.border_color(cx.theme().destructive)
                     })
                     .when(!has_error, |el| {
-                        el.border_color(cx.theme().colors().border)
+                        el.border_color(cx.theme().border)
                     })
             )
             .when_some(self.error, |el, error| {
                 el.child(
                     div()
                         .text_sm()
-                        .text_color(cx.theme().colors().destructive)
+                        .text_color(cx.theme().destructive)
                         .child(error)
                 )
             })
@@ -644,6 +648,8 @@ impl ExpensiveComponent {
 Implement lazy loading for large datasets:
 
 ```rust
+use std::ops::Range;
+
 pub struct LazyList<T> {
     items: Vec<T>,
     visible_range: Range<usize>,
@@ -651,18 +657,12 @@ pub struct LazyList<T> {
 }
 
 impl<T> LazyList<T> {
-    fn render_visible_items(&self, cx: &mut WindowContext) -> impl IntoElement {
+    fn render_visible_items(&self, _window: &mut Window, _cx: &mut App) -> impl IntoElement {
         div()
             .flex()
             .flex_col()
-            .children(
-                self.items[self.visible_range.clone()]
-                    .iter()
-                    .enumerate()
-                    .map(|(index, item)| {
-                        self.render_item(index, item, cx)
-                    })
-            )
+            // Note: simplified example - actual implementation would map items
+            .child("Lazy list items")
     }
 }
 ```
@@ -735,7 +735,7 @@ Document components with examples:
 /// Button::new("delete")
 ///     .label("Delete")
 ///     .destructive()
-///     .on_click(|event, cx| {
+///     .on_click(|event, window, cx| {
 ///         // Handle deletion
 ///     })
 /// 
@@ -754,24 +754,27 @@ pub struct Button {
 Create comprehensive stories for the gallery:
 
 ```rust
-pub fn button_story(cx: &mut WindowContext) -> impl IntoElement {
-    StoryContainer::new("Button", cx)
+pub fn button_story(_window: &mut Window, _cx: &mut App) -> impl IntoElement {
+    div()
+        .flex()
+        .flex_col()
+        .gap_4()
         .child(
-            section!("Variants")
+            div().child("Variants")
                 .child(Button::new("default").label("Default"))
                 .child(Button::new("primary").label("Primary").primary())
                 .child(Button::new("secondary").label("Secondary").secondary())
                 .child(Button::new("destructive").label("Destructive").destructive())
         )
         .child(
-            section!("Sizes")
+            div().child("Sizes")
                 .child(Button::new("xs").label("Extra Small").xsmall())
                 .child(Button::new("sm").label("Small").small())
                 .child(Button::new("md").label("Medium"))
                 .child(Button::new("lg").label("Large").large())
         )
         .child(
-            section!("States")
+            div().child("States")
                 .child(Button::new("disabled").label("Disabled").disabled(true))
                 .child(Button::new("loading").label("Loading").loading(true))
         )

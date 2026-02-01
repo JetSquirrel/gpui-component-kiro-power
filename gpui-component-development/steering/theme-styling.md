@@ -16,17 +16,18 @@ GPUI Component uses a comprehensive theme system that supports:
 Access the current theme using the `ActiveTheme` trait:
 
 ```rust
-use gpui_component::theme::ActiveTheme;
+use gpui::*;
+use gpui_component::ActiveTheme;
 
 impl Render for MyView {
-    fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
         
         div()
-            .bg(theme.colors().background)
-            .text_color(theme.colors().foreground)
+            .bg(theme.background)
+            .text_color(theme.foreground)
             .border_1()
-            .border_color(theme.colors().border)
+            .border_color(theme.border)
             .child("Themed content")
     }
 }
@@ -40,42 +41,41 @@ The theme provides a comprehensive color system:
 
 ```rust
 let theme = cx.theme();
-let colors = theme.colors();
 
 // Background colors
-colors.background          // Main background
-colors.foreground          // Main text color
-colors.card                // Card backgrounds
-colors.popover             // Popover backgrounds
-colors.muted               // Muted backgrounds
-colors.muted_foreground    // Muted text
+theme.background          // Main background
+theme.foreground          // Main text color
+theme.card                // Card backgrounds
+theme.popover             // Popover backgrounds
+theme.muted               // Muted backgrounds
+theme.muted_foreground    // Muted text
 
 // Border and accent colors
-colors.border              // Default borders
-colors.input               // Input borders
-colors.ring                // Focus rings
-colors.accent              // Accent backgrounds
-colors.accent_foreground   // Accent text
+theme.border              // Default borders
+theme.input               // Input borders
+theme.ring                // Focus rings
+theme.accent              // Accent backgrounds
+theme.accent_foreground   // Accent text
 
 // Semantic colors
-colors.primary             // Primary actions
-colors.primary_foreground  // Primary text
-colors.secondary           // Secondary actions
-colors.secondary_foreground // Secondary text
-colors.destructive         // Destructive actions
-colors.destructive_foreground // Destructive text
+theme.primary             // Primary actions
+theme.primary_foreground  // Primary text
+theme.secondary           // Secondary actions
+theme.secondary_foreground // Secondary text
+theme.destructive         // Destructive actions
+theme.destructive_foreground // Destructive text
 
-// Status colors
-colors.success             // Success states
-colors.warning             // Warning states
-colors.error               // Error states
+// Status colors (if available)
+// theme.success           // Success states
+// theme.warning           // Warning states
+// theme.error             // Error states
 ```
 
 ### Using Colors in Components
 
 ```rust
 impl RenderOnce for StatusBadge {
-    fn render(self, cx: &mut WindowContext) -> impl IntoElement {
+    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme();
         
         div()
@@ -84,16 +84,16 @@ impl RenderOnce for StatusBadge {
             .rounded_md()
             .text_sm()
             .when(self.status == Status::Success, |el| {
-                el.bg(theme.colors().success)
-                  .text_color(theme.colors().background)
+                el.bg(theme.primary)  // Use primary for success
+                  .text_color(theme.primary_foreground)
             })
             .when(self.status == Status::Warning, |el| {
-                el.bg(theme.colors().warning)
-                  .text_color(theme.colors().background)
+                el.bg(theme.accent)
+                  .text_color(theme.accent_foreground)
             })
             .when(self.status == Status::Error, |el| {
-                el.bg(theme.colors().destructive)
-                  .text_color(theme.colors().destructive_foreground)
+                el.bg(theme.destructive)
+                  .text_color(theme.destructive_foreground)
             })
             .child(self.message)
     }
@@ -107,14 +107,14 @@ Create color variations using opacity:
 ```rust
 // Semi-transparent backgrounds
 div()
-    .bg(theme.colors().primary.opacity(0.1))  // 10% opacity
-    .border_color(theme.colors().primary.opacity(0.3))
+    .bg(theme.primary.opacity(0.1))  // 10% opacity
+    .border_color(theme.primary.opacity(0.3))
 
 // Hover states with opacity
 div()
-    .bg(theme.colors().accent)
+    .bg(theme.accent)
     .hover(|el| {
-        el.bg(theme.colors().accent.opacity(0.8))
+        el.bg(theme.accent.opacity(0.8))
     })
 ```
 
@@ -308,13 +308,13 @@ pub struct Card {
 }
 
 impl RenderOnce for Card {
-    fn render(self, cx: &mut WindowContext) -> impl IntoElement {
+    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme();
         
         div()
-            .bg(theme.colors().card)
+            .bg(theme.card)
             .border_1()
-            .border_color(theme.colors().border)
+            .border_color(theme.border)
             .rounded_lg()
             .shadow_sm()
             .p_6()
@@ -329,26 +329,21 @@ Styled input with focus states:
 
 ```rust
 impl RenderOnce for Input {
-    fn render(self, cx: &mut WindowContext) -> impl IntoElement {
+    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme();
         
-        input()
-            .bg(theme.colors().background)
+        // Note: For actual input, use gpui_component::input::InputState
+        div()
+            .bg(theme.background)
             .border_1()
-            .border_color(theme.colors().input)
+            .border_color(theme.input)
             .rounded_md()
             .px_3()
             .py_2()
             .text_sm()
-            .placeholder_color(theme.colors().muted_foreground)
-            .focus(|el| {
-                el.border_color(theme.colors().ring)
-                  .outline_none()
-                  .ring_2()
-                  .ring_color(theme.colors().ring.opacity(0.2))
-            })
+            .child(self.value.unwrap_or_default())
             .when(self.error.is_some(), |el| {
-                el.border_color(theme.colors().destructive)
+                el.border_color(theme.destructive)
             })
     }
 }
@@ -360,7 +355,7 @@ Different button styles:
 
 ```rust
 impl RenderOnce for Button {
-    fn render(self, cx: &mut WindowContext) -> impl IntoElement {
+    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme();
         
         div()
@@ -374,26 +369,26 @@ impl RenderOnce for Button {
             .text_sm()
             .cursor_default()  // Desktop convention
             .when(self.variant == ButtonVariant::Primary, |el| {
-                el.bg(theme.colors().primary)
-                  .text_color(theme.colors().primary_foreground)
-                  .hover(|el| el.bg(theme.colors().primary.opacity(0.9)))
+                el.bg(theme.primary)
+                  .text_color(theme.primary_foreground)
+                  .hover(|el| el.bg(theme.primary.opacity(0.9)))
             })
             .when(self.variant == ButtonVariant::Secondary, |el| {
-                el.bg(theme.colors().secondary)
-                  .text_color(theme.colors().secondary_foreground)
-                  .hover(|el| el.bg(theme.colors().secondary.opacity(0.8)))
+                el.bg(theme.secondary)
+                  .text_color(theme.secondary_foreground)
+                  .hover(|el| el.bg(theme.secondary.opacity(0.8)))
             })
             .when(self.variant == ButtonVariant::Outline, |el| {
                 el.border_1()
-                  .border_color(theme.colors().input)
-                  .bg(theme.colors().background)
-                  .hover(|el| el.bg(theme.colors().accent))
+                  .border_color(theme.input)
+                  .bg(theme.background)
+                  .hover(|el| el.bg(theme.accent))
             })
             .when(self.variant == ButtonVariant::Ghost, |el| {
-                el.hover(|el| el.bg(theme.colors().accent))
+                el.hover(|el| el.bg(theme.accent))
             })
             .when(self.variant == ButtonVariant::Link, |el| {
-                el.text_color(theme.colors().primary)
+                el.text_color(theme.primary)
                   .underline()
                   .cursor_pointer()  // Links use pointer cursor
             })
@@ -413,10 +408,13 @@ impl RenderOnce for Button {
 Add hover effects:
 
 ```rust
+// Inside RenderOnce::render(self, _window: &mut Window, cx: &mut App)
+let theme = cx.theme();
+
 div()
-    .bg(theme.colors().card)
+    .bg(theme.card)
     .hover(|el| {
-        el.bg(theme.colors().accent)
+        el.bg(theme.accent)
           .shadow_md()
     })
     .transition_all(Duration::from_millis(150))
@@ -427,12 +425,15 @@ div()
 Implement focus indicators:
 
 ```rust
+// Inside RenderOnce::render
+let theme = cx.theme();
+
 div()
     .focusable()
     .focus(|el| {
         el.outline_none()
           .ring_2()
-          .ring_color(theme.colors().ring)
+          .ring_color(theme.ring)
           .ring_offset_2()
     })
 ```
@@ -442,10 +443,13 @@ div()
 Handle active/pressed states:
 
 ```rust
+// Inside RenderOnce::render
+let theme = cx.theme();
+
 div()
     .active(|el| {
         el.scale(0.95)
-          .bg(theme.colors().accent.opacity(0.8))
+          .bg(theme.accent.opacity(0.8))
     })
 ```
 
@@ -470,9 +474,12 @@ The theme system automatically handles light/dark mode:
 
 ```rust
 // Colors automatically adjust based on current theme mode
+// Inside RenderOnce::render(self, _window: &mut Window, cx: &mut App)
+let theme = cx.theme();
+
 div()
-    .bg(theme.colors().background)     // White in light, dark in dark mode
-    .text_color(theme.colors().foreground) // Black in light, white in dark mode
+    .bg(theme.background)     // White in light, dark in dark mode
+    .text_color(theme.foreground) // Black in light, white in dark mode
 ```
 
 ### Theme Mode Detection
@@ -481,9 +488,11 @@ Check current theme mode:
 
 ```rust
 use gpui_component::theme::ThemeMode;
+use gpui_component::ActiveTheme;
 
+// Inside render method
 let theme = cx.theme();
-let is_dark = theme.mode() == ThemeMode::Dark;
+let is_dark = theme.mode == ThemeMode::Dark;
 
 div()
     .when(is_dark, |el| {
@@ -626,7 +635,7 @@ div()
 
 ```rust
 // ✅ Good - Uses theme colors
-div().bg(theme.colors().background)
+div().bg(theme.background)
 
 // ❌ Bad - Hard-coded colors
 div().bg(rgb(0xffffff))
@@ -646,10 +655,10 @@ div().p(px(17.0)).m(px(9.0))
 
 ```rust
 // ✅ Good - Semantic colors
-div().bg(theme.colors().destructive)  // For errors
+div().bg(theme.destructive)  // For errors
 
 // ❌ Bad - Generic colors
-div().bg(theme.colors().primary)      // For errors
+div().bg(theme.primary)      // For errors
 ```
 
 ### 4. Responsive Design
@@ -670,13 +679,13 @@ div().flex().flex_row()
 ```rust
 // ✅ Good - Sufficient contrast
 div()
-    .bg(theme.colors().primary)
-    .text_color(theme.colors().primary_foreground)
+    .bg(theme.primary)
+    .text_color(theme.primary_foreground)
 
 // ✅ Good - Focus indicators
 div()
     .focusable()
-    .focus(|el| el.ring_2().ring_color(theme.colors().ring))
+    .focus(|el| el.ring_2().ring_color(theme.ring))
 ```
 
 ## Troubleshooting
@@ -687,9 +696,9 @@ div()
 ```rust
 // ✅ Always access theme in render method
 impl Render for MyView {
-    fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme(); // Fresh theme access
-        div().bg(theme.colors().background)
+        div().bg(theme.background)
     }
 }
 ```

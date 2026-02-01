@@ -19,6 +19,10 @@ cargo --version
 **Platform-Specific Requirements:**
 
 **macOS:**
+
+macOS 15 or later
+Xcode command line tools
+
 ```bash
 # Install Xcode command line tools
 xcode-select --install
@@ -29,21 +33,27 @@ xcode-select --install
 
 **Linux (Ubuntu/Debian):**
 ```bash
-# Install build essentials
-sudo apt update
-sudo apt install build-essential pkg-config libssl-dev
+#!/usr/bin/env bash
 
-# Install additional dependencies for GPUI
-sudo apt install libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev
+sudo apt update
+# Test on Ubuntu 24.04
+sudo apt install -y \
+  gcc g++ clang libfontconfig-dev libwayland-dev \
+  libwebkit2gtk-4.1-dev libxkbcommon-x11-dev libx11-xcb-dev \
+  libssl-dev libzstd-dev \
+  vulkan-validationlayers libvulkan1
 ```
 
 **Windows:**
-```bash
-# Install Visual Studio Build Tools or Visual Studio Community
-# Download from: https://visualstudio.microsoft.com/downloads/
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
 
-# Ensure you have the C++ build tools installed
+winget install Microsoft.VisualStudio.2022.Community --silent --override "--wait --quiet --add ProductLang En-us --add Microsoft.VisualStudio.Workload.NativeDesktop --includeRecommended"
+scoop bucket add extras
+scoop install cmake
 ```
+
 
 ### Development Tools (Recommended)
 
@@ -89,17 +99,21 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-gpui-component = { git = "https://github.com/your-org/gpui-component", package = "ui" }
-gpui = { git = "https://github.com/zed-industries/zed", package = "gpui" }
+gpui = "0.2.2"
+gpui-component = "0.5.0"
+# Optional: for default bundled icons
+gpui-component-assets = "0.5.0"
 anyhow = "1.0"
 ```
+
+> **Note**: Check [crates.io](https://crates.io/crates/gpui-component) for the latest versions.
 
 **3. Create Basic Application Structure:**
 
 Create `src/main.rs`:
 ```rust
 use gpui::*;
-use gpui_component::prelude::*;
+use gpui_component::{button::*, *};
 
 struct MyApp {
     message: SharedString,
@@ -114,7 +128,7 @@ impl MyApp {
 }
 
 impl Render for MyApp {
-    fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         div()
             .flex()
             .flex_col()
@@ -123,16 +137,15 @@ impl Render for MyApp {
             .size_full()
             .gap_4()
             .child(
-                h1()
+                div()
                     .text_xl()
-                    .font_bold()
                     .child(self.message.clone())
             )
             .child(
                 Button::new("hello-button")
                     .label("Click Me!")
                     .primary()
-                    .on_click(cx.listener(|this, _event, _cx| {
+                    .on_click(cx.listener(|this, _event, _window, _cx| {
                         this.message = "Button clicked!".into();
                     }))
             )
@@ -140,17 +153,19 @@ impl Render for MyApp {
 }
 
 fn main() {
-    App::new().run(|cx: &mut AppContext| {
-        // CRITICAL: Initialize GPUI Component
+    let app = Application::new().with_assets(gpui_component_assets::Assets);
+
+    app.run(move |cx| {
+        // CRITICAL: Initialize GPUI Component first
         gpui_component::init(cx);
 
-        cx.spawn(|cx| async move {
-            cx.open_window(WindowOptions::default(), |cx| {
-                let app_view = cx.new_view(|_| MyApp::new());
+        cx.spawn(async move |cx| {
+            cx.open_window(WindowOptions::default(), |window, cx| {
+                let app_view = cx.new(|_| MyApp::new());
                 // Root view is required for all windows
-                cx.new_view(|cx| Root::new(app_view, cx))
-            })
-            .unwrap();
+                cx.new(|cx| Root::new(app_view, window, cx))
+            })?;
+            Ok::<_, anyhow::Error>(())
         })
         .detach();
     });
@@ -161,6 +176,12 @@ fn main() {
 ```bash
 cargo run
 ```
+
+> **✅ Checkpoint:** If `cargo run` fails, check:
+> 1. All dependencies are correctly specified in Cargo.toml
+> 2. `gpui_component::init(cx)` is called first in app.run()
+> 3. Root view wraps your main view
+> 4. The window callback has both `window` and `cx` parameters
 
 ## Project Structure Best Practices
 
@@ -216,23 +237,25 @@ fn main() {
 **src/app.rs:**
 ```rust
 use gpui::*;
-use gpui_component::prelude::*;
+use gpui_component::{button::*, *};
 use crate::views::MainView;
 
 pub struct App;
 
 impl App {
     pub fn run() {
-        gpui::App::new().run(|cx: &mut AppContext| {
-            // Initialize GPUI Component
+        let app = Application::new().with_assets(gpui_component_assets::Assets);
+
+        app.run(move |cx| {
+            // Initialize GPUI Component first
             gpui_component::init(cx);
 
-            cx.spawn(|cx| async move {
-                cx.open_window(WindowOptions::default(), |cx| {
-                    let main_view = cx.new_view(|cx| MainView::new(cx));
-                    cx.new_view(|cx| Root::new(main_view, cx))
-                })
-                .unwrap();
+            cx.spawn(async move |cx| {
+                cx.open_window(WindowOptions::default(), |window, cx| {
+                    let main_view = cx.new(|cx| MainView::new(window, cx));
+                    cx.new(|cx| Root::new(main_view, window, cx))
+                })?;
+                Ok::<_, anyhow::Error>(())
             })
             .detach();
         });
@@ -248,10 +271,10 @@ Every window MUST start with a `Root` view:
 
 ```rust
 // ✅ Correct - Root as top-level view
-cx.new_view(|cx| Root::new(my_view, cx))
+cx.new(|cx| Root::new(my_view, window, cx))
 
 // ❌ Incorrect - Direct view without Root
-cx.new_view(|_| MyView::new())
+cx.new(|_| MyView::new())
 ```
 
 The Root view provides:
@@ -266,7 +289,9 @@ Always call `gpui_component::init(cx)` before using components:
 
 ```rust
 fn main() {
-    App::new().run(|cx: &mut AppContext| {
+    let app = Application::new().with_assets(gpui_component_assets::Assets);
+
+    app.run(move |cx| {
         // This MUST be first
         gpui_component::init(cx);
         
@@ -281,15 +306,15 @@ fn main() {
 Access the current theme using the `ActiveTheme` trait:
 
 ```rust
-use gpui_component::theme::ActiveTheme;
+use gpui_component::ActiveTheme;
 
 impl Render for MyView {
-    fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
         
         div()
-            .bg(theme.colors().background)
-            .text_color(theme.colors().foreground)
+            .bg(theme.background)
+            .text_color(theme.foreground)
             .child("Themed content")
     }
 }

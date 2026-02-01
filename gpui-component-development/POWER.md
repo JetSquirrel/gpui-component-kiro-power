@@ -19,10 +19,8 @@ This knowledge base covers everything from project setup and component developme
 - Component development patterns and architecture
 - Theme system and styling approaches
 - Complex layout systems (Dock system)
-- Input handling and text management
-- Testing guidelines and best practices
-- Available Claude skills and development workflows
-- Troubleshooting common development issues
+- Stateful and stateless component patterns
+- Desktop UI conventions and best practices
 
 ## Available Steering Files
 
@@ -32,10 +30,6 @@ This power includes specialized steering files for different aspects of GPUI Com
 - **component-patterns** - Component development patterns, architecture, and best practices
 - **theme-styling** - Theme system, styling approaches, and visual design
 - **dock-layouts** - Complex panel layouts and dock system usage
-- **input-text** - Text input, rope data structures, and LSP integration
-- **testing-guide** - Testing strategies, patterns, and best practices
-- **claude-skills** - Available Claude skills and when to use them
-- **troubleshooting** - Common issues, errors, and solutions
 
 Call action "readSteering" to access specific topics as needed.
 
@@ -47,15 +41,17 @@ Add dependencies to your Cargo.toml:
 [dependencies]
 gpui = "0.2.2"
 gpui-component = "0.5.0"
-# Optional, for default bundled assets
+# Optional, for default bundled assets (Lucide icons)
 gpui-component-assets = "0.5.0"
 ```
+
+> **Note**: Check [crates.io](https://crates.io/crates/gpui-component) for the latest version.
 
 **⚠️ IMPORTANT:** You MUST call `gpui_component::init(cx)` at your application's entry point before using any GPUI Component features.
 
 ```rust
 fn main() {
-    let app = Application::new();
+    let app = Application::new().with_assets(gpui_component_assets::Assets);
     app.run(move |cx| {
         // This must be called first
         gpui_component::init(cx);
@@ -95,9 +91,29 @@ my-gpui-app/
 
 ## Core Architecture Principles
 
-### 1. Stateless Design Philosophy
+### 1. Stateless vs Stateful Components
 
-Here's a simple example to get you started:
+**Stateless Elements (Preferred):**
+Most components use stateless `RenderOnce` elements, making them simple and predictable.
+
+**Stateful Components:**
+Some components like `Dropdown`, `List`, `Table`, and `InputState` manage their own internal state. These use the `Render` trait and require creating an `Entity` to hold in your view struct.
+
+```rust
+// Stateful component example
+struct MyView {
+    input: Entity<InputState>,
+}
+
+impl MyView {
+    fn new(window: &Window, cx: &mut Context<Self>) -> Self {
+        let input = cx.new(|cx| InputState::new(window, cx).default_value("Hello"));
+        Self { input }
+    }
+}
+```
+
+Here's a simple stateless example to get you started:
 
 ```rust
 use gpui::*;
@@ -158,7 +174,20 @@ Button::new("save")
     .label("Save Changes")
 ```
 
-### 3. Desktop UI Conventions
+### 3. Component Variants
+
+Most components support visual variants:
+
+```rust
+Button::new("btn").primary()   // Primary action
+Button::new("btn").danger()    // Destructive action
+Button::new("btn").warning()   // Warning action
+Button::new("btn").success()   // Success action
+Button::new("btn").ghost()     // Ghost/transparent
+Button::new("btn").outline()   // Outlined style
+```
+
+### 4. Desktop UI Conventions
 
 - **Mouse cursor**: Buttons use `default` cursor, not `pointer` (desktop app convention)
 - **Exception**: Link buttons use `pointer` cursor
@@ -203,16 +232,18 @@ MTL_HUD_ENABLED=1 cargo run
 samply record cargo run
 ```
 
-## Project Structure
+## gpui-component Repository Structure
 
-This is a Rust workspace project with these main crates:
+If contributing to or exploring the gpui-component library itself:
 
 - **`crates/ui`** - Core UI component library (published as `gpui-component`)
 - **`crates/story`** - Gallery application for showcasing and testing components
 - **`crates/macros`** - Procedural macros (`IntoPlot` derive)
-- **`crates/assets`** - Static assets
+- **`crates/assets`** - Static assets (published as `gpui-component-assets`)
 - **`crates/webview`** - WebView component support
 - **`examples/`** - Various example applications
+
+For your own projects, see the Basic Project Structure in Quick Start above.
 
 ## Key Dependencies
 
@@ -267,35 +298,15 @@ Uses `rust-i18n` crate with localization files in `crates/ui/locales/`:
 - Every component should have a builder pattern test
 - Avoid excessive simple tests
 - Use property-based testing for comprehensive coverage
-- See `.claude/COMPONENT_TEST_RULES.md` for detailed guidelines
 
 ## Getting Help
 
-### Claude Skills Available
-This project includes specialized Claude Code skills in `.claude/skills/`:
-
-**Component Development:**
-- `new-component` - Creating new components
-- `generate-component-story` - Creating gallery examples
-- `generate-component-documentation` - Component docs
-
-**GPUI Framework:**
-- `gpui-action` - Actions and keyboard shortcuts
-- `gpui-async` - Async operations
-- `gpui-context` - Context management
-- `gpui-element` - Custom elements
-- `gpui-entity` - Entity management
-- `gpui-event` - Event handling
-- `gpui-focus-handle` - Focus management
-- `gpui-global` - Global state
-- `gpui-layout-and-style` - Layout and styling
-- `gpui-test` - Testing patterns
-
 ### Documentation Resources
-- **CLAUDE.md** - Main project documentation
-- **docs/** - VitePress documentation site
-- **Component examples** - In `crates/story/src/stories`
-- **Testing rules** - `.claude/COMPONENT_TEST_RULES.md`
+- **Official Docs**: https://longbridge.github.io/gpui-component/
+- **API Reference**: https://docs.rs/gpui-component/latest/gpui_component/
+- **GPUI Framework**: https://gpui.rs and https://docs.rs/gpui/latest/gpui/
+- **Examples**: https://github.com/longbridge/gpui-component/tree/main/examples
+- **Story Gallery**: Clone the repo and run `cargo run` to explore components interactively
 
 ## Next Steps
 
@@ -303,6 +314,5 @@ This project includes specialized Claude Code skills in `.claude/skills/`:
 2. **For component development**: Read "component-patterns" for architecture guidance  
 3. **For styling**: Read "theme-styling" for theme system usage
 4. **For complex layouts**: Read "dock-layouts" for panel management
-5. **For testing**: Read "testing-guide" for comprehensive testing strategies
 
 This power provides everything you need to build robust, cross-platform desktop applications with GPUI Component. Use the steering files to dive deep into specific areas as needed.
